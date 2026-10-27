@@ -107,6 +107,26 @@ Cenário: Reprodução a partir de anexo em nota
   Então o Player de Músicas abre automaticamente e toca a faixa solicitada.
 ```
 
+#### US-05: Central de Downloads do YouTube & Localizador Nativo no PC
+* **Como** usuário que deseja centralizar conteúdos do YouTube no cofre offline,
+* **Quero** colar o link de um vídeo/música do YouTube para baixar em áudio ou vídeo, e também encontrar automaticamente mídias já baixadas no meu computador,
+* **Para que** eu possa armazenar no cofre com um clique, sem depender de sites de terceiros com anúncios.
+
+```gherkin
+Cenário: Download de música do YouTube via URL
+  Dado que estou no aplicativo e clico em "Baixar do YouTube"
+  Quando colo a URL de um vídeo do YouTube, seleciono "Apenas Áudio" e clico em "Iniciar Download"
+  Então o motor yt-dlp executa o download em thread separada com barra de progresso em tempo real
+  E salva a faixa diretamente na pasta "midia/musicas/" do cofre
+  E pergunta se o usuário deseja reproduzir a música no player na mesma hora.
+
+Cenário: Varredura nativa de mídias no PC
+  Dado que clico na aba "Localizador de Mídias no PC"
+  Quando inicio a varredura das pastas (Downloads, Músicas, Vídeos ou pasta personalizada)
+  Então o sistema lista todos os arquivos de áudio e vídeo encontrados com tamanho e data
+  E permite reproduzir imediatamente com duplo-clique ou salvar no cofre com 1 clique.
+```
+
 ---
 
 ## 3. Arquitetura do Sistema
@@ -119,17 +139,25 @@ graph TD
     AUTH[Módulo de Autenticação & Segurança Werkzeug]
     MEDIA[Gerenciador de Mídias Pillow / Shutil / Subprocess]
     AUDIO[Motor de Áudio Pygame-CE Mixer]
+    YTDL[Motor de Download YouTube yt-dlp Threaded]
+    SCAN[Scanner Nativo de Mídias os.scandir]
     DAO[Camada de Persistência SQLite3]
     FS[(Sistema de Arquivos Local: DB & midia/)]
+    PC_FS[(Pastas do PC: Downloads, Músicas, Vídeos)]
 
     UI -->|Credenciais & Recuperação| AUTH
     UI -->|Comandos CRUD & Filtros| DAO
     UI -->|Upload & Preview Gráfico| MEDIA
     UI -->|Controles de Play/Pause/Volume| AUDIO
+    UI -->|URL & Download Assíncrono| YTDL
+    UI -->|Varredura de Pastas Locais| SCAN
     AUTH -->|Verificação de Hashes| DAO
     DAO -->|database.db| FS
     MEDIA -->|imagens/ & videos/| FS
     AUDIO -->|musicas/| FS
+    YTDL -->|Download direto| FS
+    SCAN -->|Descobre e Copia| PC_FS
+    PC_FS -->|Importar para Cofre| FS
 ```
 
 ### 3.2 Estrutura de Diretórios e Componentes

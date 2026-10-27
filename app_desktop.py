@@ -4,6 +4,7 @@ import shutil
 import sqlite3
 import subprocess
 import sys
+import threading
 import tkinter as tk
 from datetime import datetime
 from tkinter import filedialog, messagebox, ttk
@@ -16,6 +17,12 @@ try:
     AUDIO_SUPPORTED = True
 except Exception:
     AUDIO_SUPPORTED = False
+
+try:
+    import yt_dlp
+    YTDLP_SUPPORTED = True
+except Exception:
+    YTDLP_SUPPORTED = False
 
 DB_NAME = "database.db"
 
@@ -1072,21 +1079,49 @@ def abrir_player_musicas(tocar_arquivo=None):
 
     btn_add_musica = tk.Button(
         top_pl,
-        text="➕ Importar Músicas",
+        text="➕ Importar",
         font=FONT_SMALL,
         bg="#10B981",
         fg="white",
         bd=0,
-        padx=8,
+        padx=6,
         pady=3,
         cursor="hand2",
         command=importar_musicas_dialog,
     )
     btn_add_musica.pack(side="right", padx=2)
 
+    btn_yt_dl_pl = tk.Button(
+        top_pl,
+        text="⬇️ YouTube",
+        font=FONT_SMALL,
+        bg="#DC2626",
+        fg="white",
+        bd=0,
+        padx=6,
+        pady=3,
+        cursor="hand2",
+        command=lambda: abrir_central_youtube(0),
+    )
+    btn_yt_dl_pl.pack(side="right", padx=2)
+
+    btn_scan_pc_pl = tk.Button(
+        top_pl,
+        text="🔍 Varrer PC",
+        font=FONT_SMALL,
+        bg="#2563EB",
+        fg="white",
+        bd=0,
+        padx=6,
+        pady=3,
+        cursor="hand2",
+        command=lambda: abrir_central_youtube(1),
+    )
+    btn_scan_pc_pl.pack(side="right", padx=2)
+
     btn_pasta_mus = tk.Button(
         top_pl,
-        text="📁 Abrir Pasta",
+        text="📁 Pasta",
         font=FONT_SMALL,
         bg="#334155" if current_theme == "dark" else "#E2E8F0",
         fg="white" if current_theme == "dark" else "#0F172A",
@@ -1098,7 +1133,7 @@ def abrir_player_musicas(tocar_arquivo=None):
         if sys.platform == "win32"
         else subprocess.call(["open", PASTA_MUSICAS]),
     )
-    btn_pasta_mus.pack(side="right", padx=4)
+    btn_pasta_mus.pack(side="right", padx=2)
 
     # Busca
     frame_busca = tk.Frame(frame_playlist, bg=colors["card"])
@@ -1158,6 +1193,702 @@ def abrir_player_musicas(tocar_arquivo=None):
         tocar_faixa_por_caminho(tocar_arquivo)
 
     loop_monitor_musica()
+
+
+# --- CENTRAL DE DOWNLOADS DO YOUTUBE & LOCALIZADOR DE MÍDIAS NO COMPUTADOR ---
+central_yt_win = None
+
+def formatar_tamanho_bytes(num_bytes):
+    for unit in ['B', 'KB', 'MB', 'GB']:
+        if abs(num_bytes) < 1024.0:
+            return f"{num_bytes:3.1f} {unit}"
+        num_bytes /= 1024.0
+    return f"{num_bytes:.1f} TB"
+
+
+def abrir_central_youtube(aba_inicial=0):
+    global central_yt_win
+
+    colors = THEMES[current_theme]
+
+    if central_yt_win is not None and central_yt_win.winfo_exists():
+        central_yt_win.lift()
+        if hasattr(central_yt_win, "notebook"):
+            central_yt_win.notebook.select(aba_inicial)
+        return
+
+    central_yt_win = tk.Toplevel(root)
+    central_yt_win.title("🔴 Central YouTube & Localizador de Mídias - Cofre de Notas")
+    central_yt_win.geometry("640x700")
+    central_yt_win.minsize(580, 620)
+    central_yt_win.configure(bg=colors["bg"])
+
+    try:
+        icon_p = obter_logo_image(32, 32)
+        if icon_p:
+            central_yt_win.iconphoto(False, icon_p)
+    except Exception:
+        pass
+
+    notebook = ttk.Notebook(central_yt_win)
+    notebook.pack(fill="both", expand=True, padx=12, pady=12)
+    central_yt_win.notebook = notebook
+
+    # ========================================================
+    # ABA 1: BAIXAR DO YOUTUBE
+    # ========================================================
+    aba_download = tk.Frame(notebook, bg=colors["bg"], padx=15, pady=15)
+    notebook.add(aba_download, text="  ⬇️ Baixar do YouTube  ")
+
+    card_head_yt = tk.Frame(
+        aba_download,
+        bg=colors["card"],
+        highlightbackground=colors["card_border"],
+        highlightthickness=1,
+        padx=15,
+        pady=12,
+    )
+    card_head_yt.pack(fill="x", pady=(0, 12))
+
+    tk.Label(
+        card_head_yt,
+        text="🔴 Baixador Oficial do YouTube",
+        font=("Segoe UI", 13, "bold"),
+        bg=colors["card"],
+        fg="#DC2626",
+    ).pack(anchor="w")
+    tk.Label(
+        card_head_yt,
+        text="Cole o link de qualquer vídeo ou shorts do YouTube para salvar no cofre offline.",
+        font=FONT_SMALL,
+        bg=colors["card"],
+        fg=colors["text_muted"],
+    ).pack(anchor="w", pady=(2, 0))
+
+    card_form = tk.Frame(
+        aba_download,
+        bg=colors["card"],
+        highlightbackground=colors["card_border"],
+        highlightthickness=1,
+        padx=15,
+        pady=15,
+    )
+    card_form.pack(fill="x", pady=(0, 12))
+
+    tk.Label(
+        card_form,
+        text="Link do Vídeo ou Música do YouTube:",
+        font=FONT_SUBTITLE,
+        bg=colors["card"],
+        fg=colors["text_main"],
+    ).pack(anchor="w", pady=(0, 5))
+
+    frame_link = tk.Frame(card_form, bg=colors["card"])
+    frame_link.pack(fill="x", pady=(0, 10))
+
+    entry_url = ttk.Entry(frame_link, font=FONT_REGULAR)
+    entry_url.pack(side="left", fill="x", expand=True, padx=(0, 8))
+
+    def colar_link():
+        try:
+            link = root.clipboard_get().strip()
+            entry_url.delete(0, tk.END)
+            entry_url.insert(0, link)
+        except Exception:
+            pass
+
+    btn_colar = tk.Button(
+        frame_link,
+        text="📋 Colar",
+        font=FONT_SMALL,
+        bg="#334155" if current_theme == "dark" else "#E2E8F0",
+        fg="white" if current_theme == "dark" else "#0F172A",
+        bd=0,
+        padx=10,
+        pady=4,
+        cursor="hand2",
+        command=colar_link,
+    )
+    btn_colar.pack(side="right")
+
+    tk.Label(
+        card_form,
+        text="Escolha o Formato de Saída:",
+        font=FONT_SUBTITLE,
+        bg=colors["card"],
+        fg=colors["text_main"],
+    ).pack(anchor="w", pady=(5, 5))
+
+    tipo_var = tk.StringVar(value="audio")
+
+    rb_frame = tk.Frame(card_form, bg=colors["card"])
+    rb_frame.pack(fill="x", pady=(0, 12))
+
+    rb_audio = tk.Radiobutton(
+        rb_frame,
+        text="🎵 Apenas Áudio / Música (Salva na pasta de Músicas do Cofre)",
+        variable=tipo_var,
+        value="audio",
+        font=FONT_REGULAR,
+        bg=colors["card"],
+        fg=colors["text_main"],
+        selectcolor=colors["input_bg"],
+        activebackground=colors["card"],
+    )
+    rb_audio.pack(anchor="w", pady=2)
+
+    rb_video = tk.Radiobutton(
+        rb_frame,
+        text="🎬 Vídeo Completo MP4 (Salva na pasta de Vídeos do Cofre)",
+        variable=tipo_var,
+        value="video",
+        font=FONT_REGULAR,
+        bg=colors["card"],
+        fg=colors["text_main"],
+        selectcolor=colors["input_bg"],
+        activebackground=colors["card"],
+    )
+    rb_video.pack(anchor="w", pady=2)
+
+    card_prog = tk.Frame(
+        aba_download,
+        bg=colors["card"],
+        highlightbackground=colors["card_border"],
+        highlightthickness=1,
+        padx=15,
+        pady=15,
+    )
+    card_prog.pack(fill="x", pady=(0, 12))
+
+    lbl_status_dl = tk.Label(
+        card_prog,
+        text="Pronto para baixar.",
+        font=FONT_REGULAR,
+        bg=colors["card"],
+        fg=colors["text_main"],
+        anchor="w",
+    )
+    lbl_status_dl.pack(fill="x", pady=(0, 4))
+
+    prog_bar = ttk.Progressbar(card_prog, orient="horizontal", mode="determinate")
+    prog_bar.pack(fill="x", pady=(0, 6))
+
+    lbl_info_dl = tk.Label(
+        card_prog,
+        text="Velocidade e progresso serão exibidos aqui durante o download.",
+        font=FONT_SMALL,
+        bg=colors["card"],
+        fg=colors["text_muted"],
+        anchor="w",
+    )
+    lbl_info_dl.pack(fill="x")
+
+    def download_thread(url, tipo):
+        if not YTDLP_SUPPORTED:
+            central_yt_win.after(
+                0,
+                lambda: messagebox.showerror(
+                    "Erro", "O módulo yt-dlp não está instalado."
+                ),
+            )
+            btn_baixar.config(state="normal", text="🚀 Iniciar Download")
+            return
+
+        def ytdl_hook(d):
+            if d['status'] == 'downloading':
+                p_str = d.get('_percent_str', '0%').replace('%', '').strip()
+                try:
+                    p_val = float(p_str)
+                except Exception:
+                    p_val = 0
+                speed = d.get('_speed_str', 'N/A')
+                eta = d.get('_eta_str', 'N/A')
+                total = (
+                    d.get('_total_bytes_str', '')
+                    or d.get('_total_bytes_estimate_str', '')
+                )
+                txt_status = f"Baixando: {p_str}% • Restante: {eta}"
+                txt_det = f"Velocidade: {speed} • Tamanho: {total}"
+                central_yt_win.after(
+                    0, lambda: atualizar_ui_progresso(p_val, txt_status, txt_det)
+                )
+            elif d['status'] == 'finished':
+                central_yt_win.after(
+                    0,
+                    lambda: atualizar_ui_progresso(
+                        100, "Finalizando arquivo e tags...", "Quase pronto..."
+                    ),
+                )
+
+        def atualizar_ui_progresso(val, status, info):
+            prog_bar['value'] = val
+            lbl_status_dl.config(text=status)
+            lbl_info_dl.config(text=info)
+
+        if tipo == "audio":
+            destino_dir = PASTA_MUSICAS
+            ydl_opts = {
+                'format': 'bestaudio[ext=m4a]/bestaudio/best',
+                'outtmpl': os.path.join(destino_dir, '%(title)s.%(ext)s'),
+                'noplaylist': True,
+                'progress_hooks': [ytdl_hook],
+                'quiet': True,
+                'no_warnings': True,
+            }
+        else:
+            destino_dir = PASTA_VIDEOS
+            ydl_opts = {
+                'format': 'best[ext=mp4]/best',
+                'outtmpl': os.path.join(destino_dir, '%(title)s.%(ext)s'),
+                'noplaylist': True,
+                'progress_hooks': [ytdl_hook],
+                'quiet': True,
+                'no_warnings': True,
+            }
+
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                arquivo_final = ydl.prepare_filename(info)
+                titulo_video = info.get('title', 'Arquivo do YouTube')
+
+            def download_sucesso():
+                prog_bar['value'] = 100
+                lbl_status_dl.config(text="✅ Download concluído com sucesso!")
+                lbl_info_dl.config(
+                    text=f"Salvo em: {os.path.basename(arquivo_final)}"
+                )
+                btn_baixar.config(state="normal", text="🚀 Iniciar Download")
+                entry_url.delete(0, tk.END)
+
+                if tipo == "audio":
+                    atualizar_listbox_playlist()
+                    if messagebox.askyesno(
+                        "Download Concluído",
+                        f"'{titulo_video}' foi baixado!\nDeseja reproduzir agora no Player de Músicas?",
+                    ):
+                        abrir_player_musicas(tocar_arquivo=arquivo_final)
+                else:
+                    if messagebox.askyesno(
+                        "Download Concluído",
+                        f"Vídeo '{titulo_video}' baixado com sucesso!\nDeseja assistir agora?",
+                    ):
+                        visualizar_midia(arquivo_final)
+
+            central_yt_win.after(0, download_sucesso)
+
+        except Exception as e:
+
+            def download_erro(msg):
+                prog_bar['value'] = 0
+                lbl_status_dl.config(text="❌ Falha no download.")
+                lbl_info_dl.config(text=f"Erro: {msg[:80]}")
+                btn_baixar.config(state="normal", text="🚀 Iniciar Download")
+                messagebox.showerror(
+                    "Erro no Download", f"Não foi possível baixar:\n{msg}"
+                )
+
+            central_yt_win.after(0, lambda: download_erro(str(e)))
+
+    def iniciar_download():
+        url = entry_url.get().strip()
+        if not url:
+            messagebox.showwarning(
+                "Aviso", "Por favor, cole um link do YouTube válido."
+            )
+            return
+
+        btn_baixar.config(state="disabled", text="⏳ Baixando...")
+        lbl_status_dl.config(text="Iniciando download do YouTube...")
+        lbl_info_dl.config(text="Conectando aos servidores do YouTube...")
+        prog_bar['value'] = 0
+
+        tipo = tipo_var.get()
+        t = threading.Thread(
+            target=download_thread, args=(url, tipo), daemon=True
+        )
+        t.start()
+
+    btn_baixar = tk.Button(
+        aba_download,
+        text="🚀 Iniciar Download",
+        font=FONT_SUBTITLE,
+        bg="#DC2626",
+        fg="white",
+        bd=0,
+        pady=8,
+        cursor="hand2",
+        command=iniciar_download,
+    )
+    btn_baixar.pack(fill="x", pady=5)
+
+    # ========================================================
+    # ABA 2: LOCALIZADOR NATIVO DE MÍDIAS NO COMPUTADOR
+    # ========================================================
+    aba_scanner = tk.Frame(notebook, bg=colors["bg"], padx=15, pady=15)
+    notebook.add(aba_scanner, text="  🔍 Localizador de Mídias no PC  ")
+
+    card_scan_filtro = tk.Frame(
+        aba_scanner,
+        bg=colors["card"],
+        highlightbackground=colors["card_border"],
+        highlightthickness=1,
+        padx=12,
+        pady=10,
+    )
+    card_scan_filtro.pack(fill="x", pady=(0, 10))
+
+    row_pasta = tk.Frame(card_scan_filtro, bg=colors["card"])
+    row_pasta.pack(fill="x", pady=(0, 6))
+
+    tk.Label(
+        row_pasta,
+        text="Onde procurar:",
+        font=FONT_SMALL,
+        bg=colors["card"],
+        fg=colors["text_muted"],
+    ).pack(side="left")
+
+    user_home = os.path.expanduser("~")
+    opcoes_pastas = {
+        "Todas as pastas padrão (Downloads, Músicas, Vídeos, Cofre)": "TODAS",
+        "Pasta Downloads": os.path.join(user_home, "Downloads"),
+        "Pasta Músicas": os.path.join(user_home, "Music"),
+        "Pasta Vídeos": os.path.join(user_home, "Videos"),
+        "Cofre - Músicas": PASTA_MUSICAS,
+        "Cofre - Vídeos": PASTA_VIDEOS,
+    }
+
+    combo_pasta = ttk.Combobox(
+        row_pasta, values=list(opcoes_pastas.keys()), state="readonly", width=42
+    )
+    combo_pasta.set(
+        "Todas as pastas padrão (Downloads, Músicas, Vídeos, Cofre)"
+    )
+    combo_pasta.pack(side="left", padx=5)
+
+    pasta_customizada = [""]
+
+    def escolher_pasta_custom():
+        d = filedialog.askdirectory(title="Selecionar Pasta para Varrer")
+        if d:
+            pasta_customizada[0] = d
+            combo_pasta.set(f"📂 {os.path.basename(d)}")
+            executar_varredura()
+
+    btn_custom_folder = tk.Button(
+        row_pasta,
+        text="📂 Outra...",
+        font=FONT_SMALL,
+        bg="#334155" if current_theme == "dark" else "#E2E8F0",
+        fg="white" if current_theme == "dark" else "#0F172A",
+        bd=0,
+        padx=6,
+        pady=2,
+        cursor="hand2",
+        command=escolher_pasta_custom,
+    )
+    btn_custom_folder.pack(side="left")
+
+    row_filtros = tk.Frame(card_scan_filtro, bg=colors["card"])
+    row_filtros.pack(fill="x")
+
+    tk.Label(
+        row_filtros,
+        text="🔍 Filtrar:",
+        font=FONT_SMALL,
+        bg=colors["card"],
+        fg=colors["text_muted"],
+    ).pack(side="left")
+    entry_filtro_scanner = ttk.Entry(row_filtros, width=28)
+    entry_filtro_scanner.pack(side="left", padx=5)
+    entry_filtro_scanner.bind(
+        "<KeyRelease>", lambda e: aplicar_filtro_tabela()
+    )
+
+    tipo_filtro_var = tk.StringVar(value="Todos")
+    combo_tipo_scan = ttk.Combobox(
+        row_filtros,
+        values=["Todos", "Músicas", "Vídeos"],
+        state="readonly",
+        width=10,
+        textvariable=tipo_filtro_var,
+    )
+    combo_tipo_scan.pack(side="left", padx=5)
+    combo_tipo_scan.bind(
+        "<<ComboboxSelected>>", lambda e: aplicar_filtro_tabela()
+    )
+
+    btn_revarrer = tk.Button(
+        row_filtros,
+        text="🔄 Varrer",
+        font=FONT_SMALL,
+        bg="#2563EB",
+        fg="white",
+        bd=0,
+        padx=8,
+        pady=2,
+        cursor="hand2",
+        command=lambda: executar_varredura(),
+    )
+    btn_revarrer.pack(side="right")
+
+    frame_tree = tk.Frame(
+        aba_scanner,
+        bg=colors["card"],
+        highlightbackground=colors["card_border"],
+        highlightthickness=1,
+    )
+    frame_tree.pack(fill="both", expand=True, pady=(0, 10))
+
+    tree_cols = ("nome", "tipo", "tamanho", "origem")
+    tree_scanner = ttk.Treeview(
+        frame_tree, columns=tree_cols, show="headings", selectmode="browse"
+    )
+    tree_scanner.heading("nome", text="Nome do Arquivo")
+    tree_scanner.heading("tipo", text="Tipo")
+    tree_scanner.heading("tamanho", text="Tamanho")
+    tree_scanner.heading("origem", text="Pasta / Origem")
+
+    tree_scanner.column("nome", width=240, anchor="w")
+    tree_scanner.column("tipo", width=80, anchor="center")
+    tree_scanner.column("tamanho", width=80, anchor="e")
+    tree_scanner.column("origem", width=140, anchor="w")
+
+    scroll_tree_y = ttk.Scrollbar(
+        frame_tree, orient="vertical", command=tree_scanner.yview
+    )
+    scroll_tree_x = ttk.Scrollbar(
+        frame_tree, orient="horizontal", command=tree_scanner.xview
+    )
+    tree_scanner.configure(
+        yscrollcommand=scroll_tree_y.set, xscrollcommand=scroll_tree_x.set
+    )
+
+    scroll_tree_y.pack(side="right", fill="y")
+    scroll_tree_x.pack(side="bottom", fill="x")
+    tree_scanner.pack(side="left", fill="both", expand=True)
+
+    arquivos_encontrados_cache = []
+
+    def executar_varredura():
+        arquivos_encontrados_cache.clear()
+        sel = combo_pasta.get()
+
+        diretorios_busca = []
+        if pasta_customizada[0] and sel.startswith("📂"):
+            diretorios_busca.append(("Pasta Selecionada", pasta_customizada[0]))
+        elif sel == "Todas as pastas padrão (Downloads, Músicas, Vídeos, Cofre)":
+            for rotulo, p in opcoes_pastas.items():
+                if p != "TODAS" and os.path.exists(p):
+                    diretorios_busca.append((rotulo, p))
+        elif sel in opcoes_pastas and os.path.exists(opcoes_pastas[sel]):
+            diretorios_busca.append((sel, opcoes_pastas[sel]))
+
+        ext_audio = (
+            ".mp3",
+            ".m4a",
+            ".wav",
+            ".ogg",
+            ".flac",
+            ".aac",
+            ".webm",
+            ".opus",
+        )
+        ext_video = (".mp4", ".mkv", ".avi", ".mov", ".webm")
+
+        for rotulo, dir_path in diretorios_busca:
+            if not os.path.exists(dir_path):
+                continue
+            try:
+                for entry in os.scandir(dir_path):
+                    if entry.is_file():
+                        ext = os.path.splitext(entry.name)[1].lower()
+                        tipo_item = None
+                        if ext in ext_audio:
+                            tipo_item = "🎵 Música"
+                        elif ext in ext_video:
+                            tipo_item = "🎬 Vídeo"
+
+                        if tipo_item:
+                            try:
+                                sz = formatar_tamanho_bytes(
+                                    entry.stat().st_size
+                                )
+                                mtime = entry.stat().st_mtime
+                            except Exception:
+                                sz = "Desconhecido"
+                                mtime = 0
+
+                            arquivos_encontrados_cache.append({
+                                "nome": entry.name,
+                                "caminho": entry.path,
+                                "tipo": tipo_item,
+                                "tamanho": sz,
+                                "origem": rotulo,
+                                "mtime": mtime,
+                            })
+            except Exception:
+                pass
+
+        arquivos_encontrados_cache.sort(key=lambda x: x["mtime"], reverse=True)
+        aplicar_filtro_tabela()
+
+    def aplicar_filtro_tabela():
+        tree_scanner.delete(*tree_scanner.get_children())
+        termo = entry_filtro_scanner.get().strip().lower()
+        tipo_filtro = tipo_filtro_var.get()
+
+        for item in arquivos_encontrados_cache:
+            if termo and termo not in item["nome"].lower():
+                continue
+            if tipo_filtro == "Músicas" and item["tipo"] != "🎵 Música":
+                continue
+            if tipo_filtro == "Vídeos" and item["tipo"] != "🎬 Vídeo":
+                continue
+
+            tree_scanner.insert(
+                "",
+                tk.END,
+                values=(
+                    item["nome"],
+                    item["tipo"],
+                    item["tamanho"],
+                    item["origem"],
+                ),
+                tags=(item["caminho"],),
+            )
+
+    def obter_item_selecionado():
+        sel = tree_scanner.selection()
+        if not sel:
+            messagebox.showwarning("Aviso", "Selecione um arquivo da lista.")
+            return None
+        tags = tree_scanner.item(sel[0], "tags")
+        if tags:
+            return tags[0]
+        return None
+
+    def reproduzir_selecionado():
+        caminho = obter_item_selecionado()
+        if not caminho or not os.path.exists(caminho):
+            return
+        ext = os.path.splitext(caminho)[1].lower()
+        if ext in (
+            ".mp3",
+            ".m4a",
+            ".wav",
+            ".ogg",
+            ".flac",
+            ".aac",
+            ".webm",
+            ".opus",
+        ):
+            abrir_player_musicas(tocar_arquivo=caminho)
+        else:
+            visualizar_midia(caminho)
+
+    def importar_selecionado_para_cofre():
+        caminho = obter_item_selecionado()
+        if not caminho or not os.path.exists(caminho):
+            return
+        ext = os.path.splitext(caminho)[1].lower()
+        nome_arq = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{os.path.basename(caminho)}"
+
+        if ext in (
+            ".mp3",
+            ".m4a",
+            ".wav",
+            ".ogg",
+            ".flac",
+            ".aac",
+            ".webm",
+            ".opus",
+        ):
+            dest = os.path.join(PASTA_MUSICAS, nome_arq)
+            pasta_nome = "Músicas"
+        else:
+            dest = os.path.join(PASTA_VIDEOS, nome_arq)
+            pasta_nome = "Vídeos"
+
+        if os.path.abspath(caminho) == os.path.abspath(dest):
+            messagebox.showinfo(
+                "Aviso", "Este arquivo já está guardado no seu cofre."
+            )
+            return
+
+        try:
+            shutil.copy(caminho, dest)
+            messagebox.showinfo(
+                "Sucesso",
+                f"Arquivo salvo com sucesso na pasta de {pasta_nome} do cofre!",
+            )
+            atualizar_listbox_playlist()
+            executar_varredura()
+        except Exception as e:
+            messagebox.showerror("Erro", f"Não foi possível importar: {e}")
+
+    def abrir_explorer_selecionado():
+        caminho = obter_item_selecionado()
+        if not caminho or not os.path.exists(caminho):
+            return
+        if sys.platform == "win32":
+            subprocess.run(["explorer", "/select,", os.path.normpath(caminho)])
+        else:
+            pasta = os.path.dirname(caminho)
+            subprocess.call(
+                ["open" if sys.platform == "darwin" else "xdg-open", pasta]
+            )
+
+    tree_scanner.bind("<Double-Button-1>", lambda e: reproduzir_selecionado())
+
+    frame_acoes = tk.Frame(aba_scanner, bg=colors["bg"])
+    frame_acoes.pack(fill="x")
+
+    btn_play_scan = tk.Button(
+        frame_acoes,
+        text="▶️ Reproduzir / Assistir",
+        font=FONT_SUBTITLE,
+        bg="#2563EB",
+        fg="white",
+        bd=0,
+        padx=12,
+        pady=5,
+        cursor="hand2",
+        command=reproduzir_selecionado,
+    )
+    btn_play_scan.pack(side="left", padx=(0, 6))
+
+    btn_import_cofre = tk.Button(
+        frame_acoes,
+        text="📥 Salvar no Cofre",
+        font=FONT_SUBTITLE,
+        bg="#10B981",
+        fg="white",
+        bd=0,
+        padx=12,
+        pady=5,
+        cursor="hand2",
+        command=importar_selecionado_para_cofre,
+    )
+    btn_import_cofre.pack(side="left", padx=6)
+
+    btn_abrir_pasta = tk.Button(
+        frame_acoes,
+        text="📂 Abrir no Explorador",
+        font=FONT_REGULAR,
+        bg="#334155" if current_theme == "dark" else "#E2E8F0",
+        fg="white" if current_theme == "dark" else "#0F172A",
+        bd=0,
+        padx=10,
+        pady=5,
+        cursor="hand2",
+        command=abrir_explorer_selecionado,
+    )
+    btn_abrir_pasta.pack(side="right")
+
+    central_yt_win.after(100, executar_varredura)
+    notebook.select(aba_inicial)
 
 
 def carregar_notas_local(filtro_cat="Todas"):
@@ -1709,7 +2440,20 @@ btn_player_mus = tk.Button(
     cursor="hand2",
     command=abrir_player_musicas,
 )
-btn_player_mus.pack(fill="x", pady=(15, 5))
+btn_player_mus.pack(fill="x", pady=(15, 4))
+
+btn_yt_central = tk.Button(
+    sidebar,
+    text="⬇️ Baixar do YouTube",
+    font=FONT_SUBTITLE,
+    bg="#DC2626",
+    fg="white",
+    bd=0,
+    pady=6,
+    cursor="hand2",
+    command=abrir_central_youtube,
+)
+btn_yt_central.pack(fill="x", pady=(0, 5))
 
 btn_logout = tk.Button(
     sidebar,

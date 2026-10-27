@@ -11,7 +11,7 @@ a = Analysis(
         ('midia/imagens/Logo.png', 'midia/imagens'),
         ('midia/imagens/Logo.svg', 'midia/imagens'),
     ],
-    hiddenimports=['PIL', 'werkzeug', 'sqlite3', 'pymupdf', 'pygame'],
+    hiddenimports=['PIL', 'werkzeug', 'sqlite3', 'pymupdf', 'pygame', 'yt_dlp'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
