@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Gradiente do Fundo / Ícone do App -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+
+    <!-- Gradiente Dourado para a Pena -->
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24" />
+      <stop offset="100%" stop-color="#d97706" />
+    </linearGradient>
+
+    <!-- Gradiente Metal/Cobre para o Cofre -->
+    <linearGradient id="vaultGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#0284c7" />
+    </linearGradient>
+  </defs>
+
+  <!-- Fundo Estilo App Icon (Cantos Arredondados) -->
+  <rect x="32" y="32" width="448" height="448" rx="96" fill="url(#bgGrad)" />
+
+  <!-- Corpo do Cofre (Linhas Minimalistas) -->
+  <rect x="128" y="148" width="256" height="240" rx="24" fill="none" stroke="url(#vaultGrad)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" />
+  
+  <!-- Fechadura Circular / Dial do Cofre -->
+  <circle cx="256" cy="268" r="48" fill="none" stroke="url(#vaultGrad)" stroke-width="12" />
+  <circle cx="256" cy="268" r="12" fill="url(#vaultGrad)" />
+  <line x1="256" y1="220" x2="256" y2="228" stroke="url(#vaultGrad)" stroke-width="8" stroke-linecap="round" />
+  <line x1="256" y1="308" x2="256" y2="316" stroke="url(#vaultGrad)" stroke-width="8" stroke-linecap="round" />
+  <line x1="208" y1="268" x2="216" y2="268" stroke="url(#vaultGrad)" stroke-width="8" stroke-linecap="round" />
+  <line x1="296" y1="268" x2="304" y2="268" stroke="url(#vaultGrad)" stroke-width="8" stroke-linecap="round" />
+
+  <!-- Pena de Escrever Integrada na Entrada Superior -->
+  <g transform="rotate(-35 320 120)">
+    <!-- Corpo da Pena -->
+    <path d="M 320 60 C 320 60, 360 100, 310 180 C 290 150, 290 110, 320 60 Z" fill="url(#goldGrad)" />
+    <!-- Haste Central -->
+    <path d="M 320 60 L 290 210" stroke="#fef3c7" stroke-width="6" stroke-linecap="round" />
+    <!-- Bico da Pena (NIB) -->
+    <path d="M 290 210 L 280 235 L 300 230 Z" fill="#fef3c7" />
+  </g>
+</svg>

@@ -123,7 +123,61 @@ categoria_atual = "Todas"
 caminho_midia_selecionado = ""
 
 
-# --- DESENHO DA LOGO MINIMALISTA & MODERNA REFORMULADA ---
+# --- CARREGAMENTO DO LOGO OFICIAL (SVG / PNG) ---
+_logo_cache = {}
+
+def obter_logo_image(largura=48, altura=48):
+    chave = (largura, altura)
+    if chave in _logo_cache:
+        return _logo_cache[chave]
+
+    caminhos = [
+        os.path.join("midia", "imagens", "Logo.png"),
+        os.path.join("midia", "imagens", "Logo.svg"),
+        "logo.png",
+    ]
+    for p in caminhos:
+        if os.path.exists(p):
+            try:
+                # Se for SVG e não existir PNG, converte em tempo de execução via pymupdf
+                if p.lower().endswith(".svg"):
+                    png_subst = os.path.splitext(p)[0] + ".png"
+                    if os.path.exists(png_subst):
+                        p = png_subst
+                    else:
+                        try:
+                            import pymupdf
+                            doc = pymupdf.open(p)
+                            pix = doc[0].get_pixmap()
+                            pix.save(png_subst)
+                            p = png_subst
+                        except Exception:
+                            continue
+
+                img = Image.open(p).convert("RGBA")
+                img = img.resize((largura, altura), Image.Resampling.LANCZOS)
+                photo = ImageTk.PhotoImage(img)
+                _logo_cache[chave] = photo
+                return photo
+            except Exception:
+                continue
+    return None
+
+
+def renderizar_logo(canvas, largura=48, altura=48, bg_cor=None):
+    canvas.delete("all")
+    if bg_cor:
+        canvas.configure(bg=bg_cor)
+
+    photo = obter_logo_image(largura, altura)
+    if photo:
+        canvas.image = photo  # Mantém referência para o coletor de lixo
+        canvas.create_image(largura // 2, altura // 2, image=photo)
+    else:
+        desenhar_logo_cofre_pena(canvas, 0, 0)
+
+
+# --- DESENHO DE FALLBACK (CASO LOGO NÃO EXISTA) ---
 def desenhar_logo_cofre_pena(canvas, x=2, y=2):
     canvas.delete("all")
     colors = THEMES[current_theme]
@@ -609,8 +663,8 @@ def aplicar_tema():
         text="🌙 Modo Escuro" if current_theme == "light" else "☀️ Modo Claro"
     )
 
-    desenhar_logo_cofre_pena(canvas_logo_login, 0, 0)
-    desenhar_logo_cofre_pena(canvas_logo_side, 0, 0)
+    renderizar_logo(canvas_logo_login, 64, 64, colors["card"])
+    renderizar_logo(canvas_logo_side, 40, 40, "#0F172A")
 
     if logged_user_id:
         carregar_notas_local(categoria_atual)
@@ -662,6 +716,14 @@ root = tk.Tk()
 root.title("Cofre de Notas - Gerenciador Pessoal")
 root.geometry("920x700")
 
+# Ícone do aplicativo na janela e na barra de tarefas
+try:
+    _icon_img = obter_logo_image(64, 64)
+    if _icon_img:
+        root.iconphoto(False, _icon_img)
+except Exception:
+    pass
+
 style = ttk.Style()
 style.theme_use("clam")
 
@@ -671,9 +733,9 @@ card_login = tk.Frame(frame_login, padx=35, pady=35, highlightthickness=1)
 card_login.pack(pady=50)
 
 canvas_logo_login = tk.Canvas(
-    card_login, width=48, height=48, highlightthickness=0
+    card_login, width=64, height=64, highlightthickness=0
 )
-canvas_logo_login.pack()
+canvas_logo_login.pack(pady=(0, 10))
 
 tk.Label(card_login, text="Cofre de Notas", font=("Segoe UI", 22, "bold")).pack()
 tk.Label(
@@ -889,9 +951,9 @@ logo_box = tk.Frame(sidebar, bg="#0F172A")
 logo_box.pack(fill="x", pady=(0, 15))
 
 canvas_logo_side = tk.Canvas(
-    logo_box, width=48, height=48, bg="#0F172A", highlightthickness=0
+    logo_box, width=40, height=40, bg="#0F172A", highlightthickness=0
 )
-canvas_logo_side.pack(side="left")
+canvas_logo_side.pack(side="left", padx=(0, 6))
 
 tk.Label(
     logo_box,
