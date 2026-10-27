@@ -88,6 +88,25 @@ Cenário: Criação de nota com imagem anexada
   E a lista de cards é atualizada imediatamente.
 ```
 
+#### US-04: Player de Músicas e Áudios Offline (YouTube / Local)
+* **Como** usuário do cofre de notas,
+* **Quero** ouvir músicas baixadas do YouTube e arquivos de áudio locais dentro do app,
+* **Para que** eu possa escutar conteúdos sonoros, playlists e estudos sem sair do ambiente offline e enquanto gerencio minhas notas.
+
+```gherkin
+Cenário: Reprodução de faixa importada
+  Dado que estou no Dashboard principal do Cofre
+  Quando clico em "Player de Músicas" na barra lateral
+  E clico em "Importar Músicas" selecionando um arquivo ".mp3" ou ".m4a" baixado do YouTube
+  Então o áudio é armazenado em "midia/musicas/" e adicionado à playlist
+  E o mixer Pygame inicia a reprodução imediatamente, animando o disco de vinil e o cronômetro.
+
+Cenário: Reprodução a partir de anexo em nota
+  Dado que uma nota possui um anexo com extensão de áudio (".mp3", ".wav", etc.)
+  Quando clico no botão "Ouvir Música" no card da nota
+  Então o Player de Músicas abre automaticamente e toca a faixa solicitada.
+```
+
 ---
 
 ## 3. Arquitetura do Sistema
@@ -98,27 +117,31 @@ Cenário: Criação de nota com imagem anexada
 graph TD
     UI[Camada de Apresentação Tkinter / TTK]
     AUTH[Módulo de Autenticação & Segurança Werkzeug]
-    MEDIA[Gerenciador de Mídias Locais Pillow / Shutil / Subprocess]
+    MEDIA[Gerenciador de Mídias Pillow / Shutil / Subprocess]
+    AUDIO[Motor de Áudio Pygame-CE Mixer]
     DAO[Camada de Persistência SQLite3]
     FS[(Sistema de Arquivos Local: DB & midia/)]
 
     UI -->|Credenciais & Recuperação| AUTH
     UI -->|Comandos CRUD & Filtros| DAO
-    UI -->|Upload & Preview de Mídias| MEDIA
+    UI -->|Upload & Preview Gráfico| MEDIA
+    UI -->|Controles de Play/Pause/Volume| AUDIO
     AUTH -->|Verificação de Hashes| DAO
     DAO -->|database.db| FS
     MEDIA -->|imagens/ & videos/| FS
+    AUDIO -->|musicas/| FS
 ```
 
 ### 3.2 Estrutura de Diretórios e Componentes
 
 | Caminho / Arquivo | Responsabilidade |
 | :--- | :--- |
-| `app_desktop.py` | Ponto de entrada (Entrypoint), gerenciador de janelas, bindings de eventos e regras de negócios. |
-| `app_desktop.spec` | Arquivo de manifesto PyInstaller para compilação binária (assets, binários, flags de console). |
+| `app_desktop.py` | Ponto de entrada (Entrypoint), gerenciador de janelas, bindings de eventos, player de música e regras de negócios. |
+| `app_desktop.spec` | Arquivo de manifesto PyInstaller para compilação binária (assets, binários, flags de console, pygame). |
 | `database.db` | Banco de dados relacional embarcado SQLite. |
 | `midia/imagens/` | Repositório de arquivos gráficos copiados (`.png`, `.jpg`, `.jpeg`, `.gif`, `.bmp`). |
 | `midia/videos/` | Repositório de mídias de vídeo (`.mp4`, `.avi`, `.mkv`, `.mov`). |
+| `midia/musicas/` | Repositório de faixas de áudio e músicas baixadas do YouTube (`.mp3`, `.wav`, `.ogg`, `.flac`, `.m4a`, `.aac`). |
 
 ---
 
